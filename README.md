@@ -1,1 +1,1 @@
-# Competencia_UAH_Postrado
+# Competencia_UAH_Posgrado
