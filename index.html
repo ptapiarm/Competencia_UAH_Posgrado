@@ -420,16 +420,20 @@ function pintarLista(f) {
 function pintarFacMain() {
   const f = FILTROS.find(x => x.key === 'f'); const s = state.sel.f;
   const cont = document.getElementById('fac-pills'); cont.innerHTML = '';
-  const ops = opcionesDe(f);
+  // Número = programas UAH (tablas) que quedarían en cada facultad con los demás filtros activos
+  const guard = state.sel.f;
+  const nProg = fac => { state.sel.f = fac ? new Set([fac]) : new Set(); const n = grupos().length; state.sel.f = guard; return n; };
+  const ops = opcionesDe(f).map(o => ({ v: o.v, c: nProg(o.v) }));
   const todas = el('button', 'fac-pill'); todas.type = 'button';
-  todas.append(document.createTextNode('Todas'), el('span', 'n', ops.reduce((a, o) => a + o.c, 0)));
-  todas.setAttribute('aria-pressed', String(s.size === 0));
+  todas.append(document.createTextNode('Todas'), el('span', 'n', nProg(null)));
+  todas.setAttribute('aria-pressed', String(s.size === 0)); todas.title = 'Programas UAH en todas las facultades';
   todas.addEventListener('click', () => { s.clear(); cambio(); });
   cont.append(todas);
   ops.forEach(o => {
     const b = el('button', 'fac-pill' + (o.c === 0 && !s.has(o.v) ? ' zero' : '')); b.type = 'button';
     b.append(document.createTextNode(o.v), el('span', 'n', o.c));
     b.setAttribute('aria-pressed', String(s.has(o.v)));
+    b.title = o.c + ' programa' + (o.c === 1 ? '' : 's') + ' UAH';
     b.addEventListener('click', () => { s.clear(); s.add(o.v); cambio(); });
     cont.append(b);
   });
