@@ -521,7 +521,9 @@ function pintarKPIs(gs) {
   add('Programas competidores', comp.size.toLocaleString('es-CL'), ies.size + ' instituciones');
   add('<span class="uahdot"></span>UAH · ' + metricLabel() + ' ' + ano, hayUah ? fmtNum(uahNow) : '—', hayUah ? fmtPct(crec(uahNow, uahPrev)) + ' vs ' + (ano - 1) : 'Sin fila UAH en vista');
   add('Mercado · ' + metricLabel() + ' ' + ano, fmtNum(mkNow), fmtPct(crec(mkNow, mkPrev)) + ' vs ' + (ano - 1) + (hayUah && mkNow ? ' · UAH = ' + Math.round(uahNow / (uahNow + mkNow) * 100) + '% del total' : ''));
-  add('Arancel mediano ' + ano, fmtM(mediana(ars)), 'UAH: ' + fmtM(mediana(arsUah)));
+  const promedio = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+  add('Arancel promedio ' + ano, fmtM(promedio(ars)), 'UAH: ' + fmtM(promedio(arsUah)));
+  add('Mediana de Arancel ' + ano, fmtM(mediana(ars)), 'UAH: ' + fmtM(mediana(arsUah)));
 }
 
 // ---------- pestaña tablas ----------
