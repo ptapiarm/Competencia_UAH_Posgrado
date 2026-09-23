@@ -156,7 +156,7 @@
   .tbl-title { font-weight: 600; font-size: 13px; margin: 0 0 6px 2px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
   .tbl-title .meta { font-weight: 400; font-size: 11.5px; color: var(--text-secondary); }
   .scroll { overflow-x: auto; border: 0.5px solid var(--border); border-radius: var(--radius); }
-  table { border-collapse: collapse; font-size: 12px; width: 100%; min-width: 1180px; }
+  table { border-collapse: collapse; font-size: 12px; width: 100%; min-width: 1000px; }
   th, td { padding: 6px 8px; border-bottom: 0.5px solid var(--border); white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; }
   th { font-weight: 500; color: var(--text-secondary); background: var(--surface-2); }
   th.grp { text-align: center; font-size: 11px; letter-spacing: .02em; }
@@ -532,8 +532,7 @@ function pintarTablas(gs) {
   const ml = state.metric === 'm1' ? 'Matrícula primer año' : 'Matrícula total';
   document.getElementById('note-tablas').innerHTML = state.metric !== 'm1'
     ? 'Matrícula total de cada año (todas las cohortes). Desmarca una fila para sacarla de los totales, del promedio y de las otras pestañas.'
-    : '<strong>Var.</strong> = ' + ml.toLowerCase() + ' ' + ult(ANIOS) + ' − ' + (ult(ANIOS) - 1) + ' &nbsp;·&nbsp; <strong>% crec.</strong> = Var. ÷ valor ' + (ult(ANIOS) - 1) + ' × 100 &nbsp;·&nbsp; ' +
-    '<strong>% ocup.</strong> = matrícula primer año ' + ult(ANIOS) + ' ÷ (vacantes semestre 1 + semestre 2) × 100; siempre con matrícula de primer año, aunque elijas matrícula total. Desmarca una fila para sacarla de los totales, del promedio y de las otras pestañas.';
+    : '<strong>Var.</strong> = ' + ml.toLowerCase() + ' ' + ult(ANIOS) + ' − ' + (ult(ANIOS) - 1) + ' (en número de estudiantes). Desmarca una fila para sacarla de los totales, del promedio y de las otras pestañas.';
   if (!gs.length) { cont.append(el('div', 'empty', 'Ningún programa coincide con los filtros. Quita alguno o usa «Limpiar filtros».')); return; }
   let facAct = null;
   gs.forEach(g => {
@@ -552,8 +551,8 @@ function tablaGrupo(g, ml) {
   const g1 = el('tr');
   const gcell = (txt, span, cls) => { const c = el('th', 'grp' + (cls ? ' ' + cls : ''), txt); c.colSpan = span; return c; };
   const c0 = el('th', 'stick0'); const c1 = el('th', 'stick1');
-  g1.append(c0, c1, gcell('Programa', 3), gcell('Vacantes ' + ult(ANIOS), 2), gcell(ml, ANIOS.length));
-  if (conCmp) g1.append(gcell('Comparativa ' + ult(ANIOS) + ' vs ' + (ult(ANIOS) - 1), 3));
+  g1.append(c0, c1, gcell('Programa', 3), gcell(ml, ANIOS.length));
+  if (conCmp) g1.append(gcell('Var.', 1));
   g1.append(gcell('Arancel', 1));
   th.append(g1);
   const g2 = el('tr');
@@ -564,9 +563,9 @@ function tablaGrupo(g, ml) {
   cbAll.checked = compRows.every(r => !state.excl.has(r.key)); cbAll.indeterminate = !cbAll.checked && compRows.some(r => !state.excl.has(r.key));
   cbAll.addEventListener('change', () => { compRows.forEach(r => cbAll.checked ? state.excl.delete(r.key) : state.excl.add(r.key)); cambio(); });
   allBox.append(cbAll);
-  g2.append(allBox, hc('Institución', 'stick1 l'), hc('Nombre programa', 'l'), hc('Modalidad / Jornada', 'l'), hc('Acred.', 'l', 'Acreditación del programa'), hc('Sem. 1', '', 'Vacantes semestre uno'), hc('Sem. 2', '', 'Vacantes semestre dos'));
+  g2.append(allBox, hc('Institución', 'stick1 l'), hc('Nombre programa', 'l'), hc('Modalidad / Jornada', 'l'), hc('Acred.', 'l', 'Acreditación del programa'));
   ANIOS.forEach(y => g2.append(hc(String(y))));
-  if (conCmp) g2.append(hc('Var.', '', 'Diferencia ' + ult(ANIOS) + ' − ' + (ult(ANIOS) - 1)), hc('% crec.', '', 'Crecimiento ' + ult(ANIOS) + ' vs ' + (ult(ANIOS) - 1)), hc('% ocup.', '', 'Matrícula primer año ' + ult(ANIOS) + ' ÷ (vacantes sem. 1 + sem. 2) × 100'));
+  if (conCmp) g2.append(hc(ult(ANIOS) + '−' + (ult(ANIOS) - 1), '', 'Diferencia de matrícula ' + ult(ANIOS) + ' − ' + (ult(ANIOS) - 1)));
   g2.append(hc(String(ult(DATA.aniosAr))));
   th.append(g2);
 
@@ -588,14 +587,11 @@ function tablaGrupo(g, ml) {
     tr.append(cp);
     const mj = el('td', 'l'); mj.append(document.createTextNode(r.m)); mj.append(el('span', 'sub', r.j)); tr.append(mj);
     tr.append(el('td', 'l', r.ac === 'Acreditada' ? 'Sí' : 'No'));
-    tr.append(el('td', null, fmtNum(r.v1)), el('td', null, fmtNum(r.v2)));
     const a = serie(r);
     a.forEach(v => tr.append(el('td', null, fmtNum(v))));
     if (conCmp) {
       const d = (ult(a) !== null && pen(a) !== null) ? ult(a) - pen(a) : null;
       tr.append(el('td', d < 0 ? 'neg' : '', fmtDelta(d)));
-      const cr = crec(ult(a), pen(a)); tr.append(el('td', cr < 0 ? 'neg' : '', fmtPct(cr)));
-      const m1u = ult(r.m1); tr.append(el('td', null, (m1u !== null && r.vac) ? Math.round(m1u / r.vac * 100) + '%' : '—'));
     }
     tr.append(el('td', null, fmtCLP(ult(r.ar))));
     tb.append(tr);
@@ -606,14 +602,11 @@ function tablaGrupo(g, ml) {
     tr.append(el('td', 'stick0'));
     const l = el('td', 'stick1', label); if (tip) l.title = tip; tr.append(l);
     tr.append(el('td'), el('td'), el('td'));
-    tr.append(el('td', null, fmtNum(v1)), el('td', null, fmtNum(v2)));
     serieV.forEach(v => tr.append(el('td', null, fmtNum(v))));
     if (conCmp) {
       const lst = ult(serieV), prv = pen(serieV);
       const d = (lst !== null && prv !== null) ? lst - prv : null;
       tr.append(el('td', d < 0 ? 'neg' : '', fmtDelta(d)));
-      const cr = crec(lst, prv); tr.append(el('td', cr < 0 ? 'neg' : '', fmtPct(cr)));
-      tr.append(el('td', null, ocup === null ? '—' : Math.round(ocup) + '%'));
     }
     tr.append(el('td', null, ar));
     tb.append(tr);
