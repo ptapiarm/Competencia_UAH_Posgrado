@@ -76,11 +76,24 @@
   }
   .panel-header img { height: 64px; display: block; max-width: 100%; }
   .panel-title { font-weight: 700; font-size: 15px; color: #ffffff; }
+  .panel-source { font-size: 11.5px; color: rgba(255,255,255,0.6); margin-top: 6px; }
   .panel-subtitle { font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 2px; }
 
   /* Filtros */
   .filters { background: var(--surface-1); border-radius: 10px; padding: 12px; margin-bottom: 1rem; }
   .filters-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+  .fac-main { padding: 2px 2px 12px; margin-bottom: 12px; border-bottom: 0.5px solid var(--border-strong); }
+  .fac-main-lbl { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .fac-pills { display: flex; flex-wrap: wrap; gap: 8px; }
+  .fac-pill { background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 999px; padding: 9px 16px; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+  .fac-pill:hover { border-color: var(--accent); }
+  .fac-pill .n { font-size: 12px; font-weight: 500; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .fac-pill[aria-pressed="true"] { background: #000; border-color: #000; color: #fff; }
+  .fac-pill[aria-pressed="true"] .n { color: rgba(255,255,255,0.7); }
+  :root[data-theme="dark"] .fac-pill[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #000; }
+  :root[data-theme="dark"] .fac-pill[aria-pressed="true"] .n { color: rgba(0,0,0,0.65); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fac-pill[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #000; } :root:not([data-theme="light"]) .fac-pill[aria-pressed="true"] .n { color: rgba(0,0,0,0.65); } }
+  .fac-pill.zero { opacity: 0.45; }
   .ms { position: relative; }
   .ms-btn {
     width: 100%; text-align: left; background: var(--surface-2); border: 0.5px solid var(--border);
@@ -192,11 +205,16 @@
     <div>
       <div class="panel-title">Panel de competencia de Postgrado</div>
       <div class="panel-subtitle">Programas de Magíster y Doctorado de la UAH frente a sus competidores, por Facultad</div>
+      <div class="panel-source">Construido con información de SIES. Fecha de corte para contabilizar matriculados: 15 de mayo de cada año.</div>
     </div>
   </div>
   <h2 class="sr-only">Panel comparativo de matrícula, vacantes y aranceles de programas de postgrado UAH y su competencia</h2>
 
   <section class="filters" aria-label="Filtros">
+    <div class="fac-main" role="group" aria-labelledby="fac-main-lbl">
+      <div class="fac-main-lbl" id="fac-main-lbl">Facultad</div>
+      <div class="fac-pills" id="fac-pills"></div>
+    </div>
     <div class="filters-grid" id="filters-grid"></div>
     <div class="filters-bar">
       <span style="color:var(--text-secondary);">Métrica</span>
@@ -273,6 +291,7 @@ try {
   const s = JSON.parse(localStorage.getItem(LS) || 'null');
   if (s) {
     FILTROS.forEach(f => { if (s.sel && Array.isArray(s.sel[f.key])) state.sel[f.key] = new Set(s.sel[f.key]); });
+    if (state.sel.f.size > 1) state.sel.f = new Set([[...state.sel.f][0]]);
     if (s.metric === 'm1' || s.metric === 'mt') state.metric = s.metric;
     if (typeof s.keepUAH === 'boolean') state.keepUAH = s.keepUAH;
     if (Array.isArray(s.excl)) state.excl = new Set(s.excl);
@@ -332,6 +351,7 @@ function cuentaParaTotal(r, met) {
 const grid = document.getElementById('filters-grid');
 let abierto = null;
 FILTROS.forEach(f => {
+  if (f.key === 'f') return; // Facultad va como filtro principal (botones)
   const wrap = el('div', 'ms'); wrap.dataset.key = f.key;
   const btn = el('button', 'ms-btn'); btn.type = 'button'; btn.setAttribute('aria-haspopup', 'true'); btn.setAttribute('aria-expanded', 'false');
   btn.append(el('span', 'ms-label', f.label), el('span', 'ms-value', f.todas));
@@ -397,8 +417,27 @@ function pintarLista(f) {
   });
   list.scrollTop = top;
 }
+function pintarFacMain() {
+  const f = FILTROS.find(x => x.key === 'f'); const s = state.sel.f;
+  const cont = document.getElementById('fac-pills'); cont.innerHTML = '';
+  const ops = opcionesDe(f);
+  const todas = el('button', 'fac-pill'); todas.type = 'button';
+  todas.append(document.createTextNode('Todas'), el('span', 'n', ops.reduce((a, o) => a + o.c, 0)));
+  todas.setAttribute('aria-pressed', String(s.size === 0));
+  todas.addEventListener('click', () => { s.clear(); cambio(); });
+  cont.append(todas);
+  ops.forEach(o => {
+    const b = el('button', 'fac-pill' + (o.c === 0 && !s.has(o.v) ? ' zero' : '')); b.type = 'button';
+    b.append(document.createTextNode(o.v), el('span', 'n', o.c));
+    b.setAttribute('aria-pressed', String(s.has(o.v)));
+    b.addEventListener('click', () => { s.clear(); s.add(o.v); cambio(); });
+    cont.append(b);
+  });
+}
 function pintarBotones() {
+  pintarFacMain();
   FILTROS.forEach(f => {
+    if (!f.ui) return;
     const s = state.sel[f.key]; const val = f.ui.btn.querySelector('.ms-value');
     if (!s.size) val.textContent = f.todas;
     else if (s.size === 1) { const v = [...s][0]; val.textContent = f.key === 'p' ? tituloCase(v) : v; }
@@ -406,7 +445,7 @@ function pintarBotones() {
     f.ui.btn.classList.toggle('active', s.size > 0);
   });
   const chips = document.getElementById('chips'); chips.innerHTML = '';
-  FILTROS.forEach(f => state.sel[f.key].forEach(v => {
+  FILTROS.filter(f => f.ui).forEach(f => state.sel[f.key].forEach(v => {
     const c = el('span', 'chip'); const t = el('span'); t.append(el('b', null, f.label + ': '), document.createTextNode(f.key === 'p' ? tituloCase(v) : v));
     const x = el('button', null, '×'); x.type = 'button'; x.setAttribute('aria-label', 'Quitar ' + v);
     x.addEventListener('click', () => { state.sel[f.key].delete(v); cambio(); });
@@ -485,8 +524,9 @@ function pintarKPIs(gs) {
 function pintarTablas(gs) {
   const cont = document.getElementById('panel-tables'); cont.innerHTML = '';
   const ml = state.metric === 'm1' ? 'Matrícula primer año' : 'Matrícula total';
-  document.getElementById('note-tablas').innerHTML =
-    '<strong>Var.</strong> = ' + ml.toLowerCase() + ' ' + ult(ANIOS) + ' − ' + (ult(ANIOS) - 1) + ' &nbsp;·&nbsp; <strong>% crec.</strong> = Var. ÷ valor ' + (ult(ANIOS) - 1) + ' × 100 &nbsp;·&nbsp; ' +
+  document.getElementById('note-tablas').innerHTML = state.metric !== 'm1'
+    ? 'Matrícula total de cada año (todas las cohortes). Desmarca una fila para sacarla de los totales, del promedio y de las otras pestañas.'
+    : '<strong>Var.</strong> = ' + ml.toLowerCase() + ' ' + ult(ANIOS) + ' − ' + (ult(ANIOS) - 1) + ' &nbsp;·&nbsp; <strong>% crec.</strong> = Var. ÷ valor ' + (ult(ANIOS) - 1) + ' × 100 &nbsp;·&nbsp; ' +
     '<strong>% ocup.</strong> = matrícula primer año ' + ult(ANIOS) + ' ÷ (vacantes semestre 1 + semestre 2) × 100; siempre con matrícula de primer año, aunque elijas matrícula total. Desmarca una fila para sacarla de los totales, del promedio y de las otras pestañas.';
   if (!gs.length) { cont.append(el('div', 'empty', 'Ningún programa coincide con los filtros. Quita alguno o usa «Limpiar filtros».')); return; }
   let facAct = null;
@@ -497,6 +537,7 @@ function pintarTablas(gs) {
 }
 function tablaGrupo(g, ml) {
   const s = resumen(g);
+  const conCmp = state.metric === 'm1';
   const wrap = el('div', 'block');
   const tt = el('div', 'tbl-title'); tt.append(el('span', null, tituloCase(g.p)), el('span', 'meta', g.n + ' · ' + s.comp.length + ' competidores marcados de ' + g.filas.filter(r => !r.isUAH).length));
   wrap.append(tt);
@@ -505,7 +546,9 @@ function tablaGrupo(g, ml) {
   const g1 = el('tr');
   const gcell = (txt, span, cls) => { const c = el('th', 'grp' + (cls ? ' ' + cls : ''), txt); c.colSpan = span; return c; };
   const c0 = el('th', 'stick0'); const c1 = el('th', 'stick1');
-  g1.append(c0, c1, gcell('Programa', 3), gcell('Vacantes ' + ult(ANIOS), 2), gcell(ml, ANIOS.length), gcell('Comparativa ' + ult(ANIOS) + ' vs ' + (ult(ANIOS) - 1), 3), gcell('Arancel', 1));
+  g1.append(c0, c1, gcell('Programa', 3), gcell('Vacantes ' + ult(ANIOS), 2), gcell(ml, ANIOS.length));
+  if (conCmp) g1.append(gcell('Comparativa ' + ult(ANIOS) + ' vs ' + (ult(ANIOS) - 1), 3));
+  g1.append(gcell('Arancel', 1));
   th.append(g1);
   const g2 = el('tr');
   const hc = (txt, cls, tip) => { const c = el('th', cls || '', txt); if (tip) c.title = tip; return c; };
@@ -517,7 +560,8 @@ function tablaGrupo(g, ml) {
   allBox.append(cbAll);
   g2.append(allBox, hc('Institución', 'stick1 l'), hc('Nombre programa', 'l'), hc('Modalidad / Jornada', 'l'), hc('Acred.', 'l', 'Acreditación del programa'), hc('Sem. 1', '', 'Vacantes semestre uno'), hc('Sem. 2', '', 'Vacantes semestre dos'));
   ANIOS.forEach(y => g2.append(hc(String(y))));
-  g2.append(hc('Var.', '', 'Diferencia ' + ult(ANIOS) + ' − ' + (ult(ANIOS) - 1)), hc('% crec.', '', 'Crecimiento ' + ult(ANIOS) + ' vs ' + (ult(ANIOS) - 1)), hc('% ocup.', '', 'Matrícula primer año ' + ult(ANIOS) + ' ÷ (vacantes sem. 1 + sem. 2) × 100'), hc(String(ult(DATA.aniosAr))));
+  if (conCmp) g2.append(hc('Var.', '', 'Diferencia ' + ult(ANIOS) + ' − ' + (ult(ANIOS) - 1)), hc('% crec.', '', 'Crecimiento ' + ult(ANIOS) + ' vs ' + (ult(ANIOS) - 1)), hc('% ocup.', '', 'Matrícula primer año ' + ult(ANIOS) + ' ÷ (vacantes sem. 1 + sem. 2) × 100'));
+  g2.append(hc(String(ult(DATA.aniosAr))));
   th.append(g2);
 
   g.filas.forEach(r => {
@@ -541,10 +585,12 @@ function tablaGrupo(g, ml) {
     tr.append(el('td', null, fmtNum(r.v1)), el('td', null, fmtNum(r.v2)));
     const a = serie(r);
     a.forEach(v => tr.append(el('td', null, fmtNum(v))));
-    const d = (ult(a) !== null && pen(a) !== null) ? ult(a) - pen(a) : null;
-    const tdD = el('td', d < 0 ? 'neg' : '', fmtDelta(d)); tr.append(tdD);
-    const cr = crec(ult(a), pen(a)); tr.append(el('td', cr < 0 ? 'neg' : '', fmtPct(cr)));
-    const m1u = ult(r.m1); tr.append(el('td', null, (m1u !== null && r.vac) ? Math.round(m1u / r.vac * 100) + '%' : '—'));
+    if (conCmp) {
+      const d = (ult(a) !== null && pen(a) !== null) ? ult(a) - pen(a) : null;
+      tr.append(el('td', d < 0 ? 'neg' : '', fmtDelta(d)));
+      const cr = crec(ult(a), pen(a)); tr.append(el('td', cr < 0 ? 'neg' : '', fmtPct(cr)));
+      const m1u = ult(r.m1); tr.append(el('td', null, (m1u !== null && r.vac) ? Math.round(m1u / r.vac * 100) + '%' : '—'));
+    }
     tr.append(el('td', null, fmtCLP(ult(r.ar))));
     tb.append(tr);
   });
@@ -556,11 +602,13 @@ function tablaGrupo(g, ml) {
     tr.append(el('td'), el('td'), el('td'));
     tr.append(el('td', null, fmtNum(v1)), el('td', null, fmtNum(v2)));
     serieV.forEach(v => tr.append(el('td', null, fmtNum(v))));
-    const lst = ult(serieV), prv = pen(serieV);
-    const d = (lst !== null && prv !== null) ? lst - prv : null;
-    tr.append(el('td', d < 0 ? 'neg' : '', fmtDelta(d)));
-    const cr = crec(lst, prv); tr.append(el('td', cr < 0 ? 'neg' : '', fmtPct(cr)));
-    tr.append(el('td', null, ocup === null ? '—' : Math.round(ocup) + '%'));
+    if (conCmp) {
+      const lst = ult(serieV), prv = pen(serieV);
+      const d = (lst !== null && prv !== null) ? lst - prv : null;
+      tr.append(el('td', d < 0 ? 'neg' : '', fmtDelta(d)));
+      const cr = crec(lst, prv); tr.append(el('td', cr < 0 ? 'neg' : '', fmtPct(cr)));
+      tr.append(el('td', null, ocup === null ? '—' : Math.round(ocup) + '%'));
+    }
     tr.append(el('td', null, ar));
     tb.append(tr);
   };
